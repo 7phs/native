@@ -7,24 +7,36 @@ import (
 )
 
 type testNativeRec struct {
-	data string
+	len      uint
+	itemSize uint
+	data     string
 
 	pool *Pool
 }
 
-func newTestNativeRec(data string) *testNativeRec {
-	return newTestNativeRecExt(data, nil)
+func newTestNativeRec(len, itemSize uint, data string) *testNativeRec {
+	return newTestNativeRecExt(len, itemSize, data, nil)
 }
 
-func newTestNativeRecExt(data string, pool *Pool) *testNativeRec {
+func newTestNativeRecExt(len, itemSize uint, data string, pool *Pool) *testNativeRec {
 	return &testNativeRec{
-		data: data,
-		pool: pool,
+		len:      len,
+		itemSize: itemSize,
+		data:     data,
+		pool:     pool,
 	}
 }
 
 func (o *testNativeRec) Add(str string) {
 	o.data = strings.Join([]string{o.data, str}, ";")
+}
+
+func (o *testNativeRec) Len() uint {
+	return o.len
+}
+
+func (o *testNativeRec) ItemSize() uint {
+	return o.itemSize
 }
 
 func (o *testNativeRec) ClearData() PoolData {
@@ -37,14 +49,18 @@ func (o *testNativeRec) FreeData() {
 }
 
 func TestPool(t *testing.T) {
-	NewPool(func(pool *Pool) interface{} {
-		return newTestNativeRecExt("", pool)
+	var itemSize uint = 16
+
+	NewPool(itemSize, func(len uint, pool *Pool) interface{} {
+		return newTestNativeRecExt(itemSize, len, "", pool)
 	})
 }
 
 func TestGetPut(t *testing.T) {
-	pool := NewPool(func(pool *Pool) interface{} {
-		return newTestNativeRecExt("create", pool)
+	var itemSize uint = 16
+
+	pool := NewPool(itemSize, func(len uint, pool *Pool) interface{} {
+		return newTestNativeRecExt(itemSize, len, "create", pool)
 	})
 
 	func() {
@@ -81,103 +97,104 @@ func TestGetPut(t *testing.T) {
 }
 
 func TestPoolManager(t *testing.T) {
-	NewPoolManager()
+	NewPoolManager(1, func(uint, *Pool) interface{} { return 5 })
 }
 
-func testKeyData(kind, itemSize uint) string {
-	return fmt.Sprintf("Key%d_%d:create", kind, itemSize)
-}
+func TestPoolManagerGetPut(t *testing.T) {
+	var (
+		itemSize1 uint = 16
+		itemSize2 uint = 32
+	)
+	manager1 := NewPoolManager(itemSize1, func(len uint, pool *Pool) interface{} {
+		return newTestNativeRecExt(len, itemSize1, testKeyData(itemSize1, len), pool)
+	})
+	manager2 := NewPoolManager(itemSize2, func(len uint, pool *Pool) interface{} {
+		return newTestNativeRecExt(len, itemSize2, testKeyData(itemSize2, len), pool)
+	})
 
-func newTestKey(kind, itemSize uint) *PoolId {
-	return &PoolId{
-		Kind:     kind,
-		ItemSize: itemSize,
-		New: func(pool *Pool) interface{} {
-			return newTestNativeRecExt(testKeyData(kind, itemSize), pool)
-		},
+	rec := manager1.Get(32).(*testNativeRec)
+	if err := manager1.Put(rec); err != nil {
+		t.Error("failed to put into pool right record with", err)
+	}
+
+	rec2 := manager2.Get(32).(*testNativeRec)
+	if err := manager1.Put(rec2); err == nil {
+		t.Error("failed to check record item size and got no error")
 	}
 }
 
-func generateTestRec(manager *PoolManager, key *PoolId) (rec1, rec2 *testNativeRec) {
-	rec1 = (manager.Get(key)).(*testNativeRec)
-	rec2 = (manager.Get(key)).(*testNativeRec)
-
-	return rec1, rec2
+func testKeyData(itemSize, len uint) string {
+	return fmt.Sprintf("Key%d_%d:create", itemSize, len)
 }
 
-func generateExpected(keys []*PoolId, part1 []string, part2 []string) (data map[string]bool) {
+func generateExpected(itemSize uint, lens []uint, itemCount uint, prefix string) (data map[string]bool) {
 	data = make(map[string]bool)
 
-	for _, key := range keys {
-		for _, str1 := range part1 {
-			for _, str2 := range part2 {
-				id := testKeyData(key.Kind, key.ItemSize) + ";clear;" + str1 + ";clear;" + str2 + ";clear"
-				data[id] = false
+	for _, len := range lens {
+		id := testKeyData(itemSize, len) + ";clear"
+
+		for i := 1; i <= int(itemCount); i++ {
+			key := id
+
+			for j := 1; j <= int(itemCount); j++ {
+				key += ";" + fmt.Sprint(prefix, i, j) + ";clear"
 			}
+
+			data[key] = false
 		}
 	}
 
 	return
 }
 
-func TestPoolManagerGet(t *testing.T) {
-	manager := NewPoolManager()
+func TestPoolManagerGetWithVariants(t *testing.T) {
+	var itemSize uint = 16
+	manager := NewPoolManager(itemSize, func(len uint, pool *Pool) interface{} {
+		return newTestNativeRecExt(len, itemSize, testKeyData(itemSize, len), pool)
+	})
+	var itemCount uint = 4
+	lens := []uint{1, 2, 4, 8}
+	prefix := "get"
 
-	// prepare key
-	Key1_16 := newTestKey(1, 16)
-	Key1_32 := newTestKey(1, 32)
-	Key2_16 := newTestKey(2, 16)
-	Key2_32 := newTestKey(2, 32)
-
-	keyList := []*PoolId{
-		Key1_16, Key1_32, Key2_16, Key2_32,
-	}
 	// stage 1: generate data
-	for _, key := range keyList {
-		func(rec1, rec2 *testNativeRec) {
-			defer manager.Put(key, rec1)
-			defer manager.Put(key, rec2)
+	for k := 0; k < int(itemCount); k++ {
+		for i, len := range lens {
+			func() {
+				for j := 1; j <= int(itemCount); j++ {
+					rec := (manager.Get(len)).(*testNativeRec)
+					defer manager.Put(rec)
 
-			rec1.Add("get11")
-			rec2.Add("get12")
-		}(generateTestRec(manager, key))
-	}
-	// stage 2: generate data
-	for _, key := range keyList {
-		func(rec1, rec2 *testNativeRec) {
-			defer manager.Put(key, rec1)
-			defer manager.Put(key, rec2)
-
-			rec1.Add("get21")
-			rec2.Add("get22")
-		}(generateTestRec(manager, key))
-	}
-	// prepare expeted data
-	expected := generateExpected(keyList,
-		[]string{"get11", "get12"},
-		[]string{"get21", "get22"})
-	// compare data with pools
-	for _, key := range keyList {
-		func() {
-			rec := (manager.Get(key)).(*testNativeRec)
-			defer manager.Put(key, rec)
-
-			for id := range expected {
-				if rec.data == id {
-					expected[id] = true
-					break
+					rec.Add(fmt.Sprint(prefix, i+1, j))
 				}
+			}()
+		}
+	}
+	// stage 2: prepare expected record lifecicle data
+	expected := generateExpected(itemSize, lens, itemCount, prefix)
+
+	expected_len := len(lens) * int(itemCount)
+	if exist_len := len(expected); exist_len != expected_len {
+		t.Error("failed to generate all possible objects lifecycle. Got ", exist_len, " options, but expected is ", expected_len)
+	}
+	// stage 3: compare data with pools
+	for _, len := range lens {
+		func() {
+			rec := (manager.Get(len)).(*testNativeRec)
+			defer manager.Put(rec)
+
+			if _, ok := expected[rec.data]; ok {
+				expected[rec.data] = true
 			}
 		}()
 	}
-	// count catching data
+	// stage 4: count catching data
 	existCount := Iterator(expected).
 		Filter(func(key string, item bool) bool {
 			return item
 		}).
 		Len()
-	// test it
-	if expectedCount := len(keyList); existCount != expectedCount {
+	// stage 5: test it
+	if expectedCount := len(lens); existCount != expectedCount {
 		t.Error("failed to check updating record in the pool manager. Changed ", existCount, " record, but expected ", expectedCount)
 	}
 }

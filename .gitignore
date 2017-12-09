@@ -1,7 +1,7 @@
 .idea
 .DS_Store
-gotemplate_*.go
 _obj
 *.o
 *.a
+gotemplate_*.go
 *.test
