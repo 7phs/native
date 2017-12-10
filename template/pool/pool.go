@@ -5,18 +5,20 @@ import "bitbucket.org/7phs/native"
 
 // template type TPoolManager(A, BSize, ItemNew)
 
-type A struct { native.Array }
+type A struct{ native.Array }
 
 const BSize = C.sizeof_int
 
-var ItemNew = func(pool native.IPool, dim ... uint) interface{} { return &A{Array:*native.NewArrayExt(pool, C.sizeof_int, dim ...)} }
+var ItemNew = func(pool native.IPool, dim ...uint) interface{} {
+	return &A{Array: *native.NewArrayExt(pool, C.sizeof_int, dim...)}
+}
 
 type TPoolManager struct {
 	native.PoolManager
 }
 
 func NewTPoolManager() *TPoolManager {
-	return  &TPoolManager{
+	return &TPoolManager{
 		PoolManager: *native.NewPoolManager(BSize, ItemNew),
 	}
 }

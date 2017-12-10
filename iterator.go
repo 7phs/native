@@ -3,7 +3,7 @@ package native
 type State = int
 
 const (
-	NEXT   State = iota + 1
+	NEXT State = iota + 1
 	SKIP
 	FINISH
 )

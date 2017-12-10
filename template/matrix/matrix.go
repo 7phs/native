@@ -43,7 +43,7 @@ func NewTMatrix(rowLen, colLen uint) *TMatrix {
 	return NewTMatrixExt(nil, rowLen, colLen)
 }
 
-func NewTMatrixInterface(pool native.IPool, dim ... uint) interface{} {
+func NewTMatrixInterface(pool native.IPool, dim ...uint) interface{} {
 	return NewTMatrixExt(pool, dim[0], dim[1])
 }
 
@@ -68,7 +68,7 @@ func (o *TMatrix) Slice() (slices [][]BM) {
 	slices = make([][]BM, rowLen)
 	for i := range slices {
 		start = colLen * i
-		slices[i] = data[start: start+colLen]
+		slices[i] = data[start : start+colLen]
 	}
 
 	return

@@ -1,9 +1,9 @@
 package array
 
 import (
+	"bitbucket.org/7phs/native"
 	"reflect"
 	"testing"
-	"bitbucket.org/7phs/native"
 )
 
 func TestNewTArray(t *testing.T) {
@@ -28,7 +28,7 @@ func TestNewTArrayExt(t *testing.T) {
 		sum += int(v)
 	}
 
-	if sum==0 {
+	if sum == 0 {
 		t.Error("failed to set data to array. Sum is empty")
 	}
 
@@ -52,7 +52,7 @@ func TestNewTArrayInterface(t *testing.T) {
 		sum += int(v)
 	}
 
-	if sum==0 {
+	if sum == 0 {
 		t.Error("failed to set data to array. Sum is empty")
 	}
 
@@ -73,21 +73,21 @@ func TestWithTArray(t *testing.T) {
 func TestTArray_Clear(t *testing.T) {
 	array := NewTArray(16)
 
-	if len := len(array.Slice()); len==0 {
+	if len := len(array.Slice()); len == 0 {
 		t.Error("failed to init tarray. Slice length is 0")
 	}
 
-	if len := len(array.Marshal()); len==0 {
+	if len := len(array.Marshal()); len == 0 {
 		t.Error("failed to init tarray. Marshaled slice length is 0")
 	}
 
 	array.Free()
 
-	if len := len(array.Slice()); len!=0 {
+	if len := len(array.Slice()); len != 0 {
 		t.Error("failed to clear tarray. Slice length is ", len)
 	}
 
-	if len := len(array.Marshal()); len!=0 {
+	if len := len(array.Marshal()); len != 0 {
 		t.Error("failed to clear tarray. Marshaled slice length is ", len)
 	}
 }

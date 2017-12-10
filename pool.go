@@ -29,7 +29,7 @@ type IPool interface {
 }
 
 /*
-*/
+ */
 type Status struct {
 	status int32
 }

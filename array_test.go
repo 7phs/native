@@ -1,8 +1,8 @@
 package native
 
 import (
-	"testing"
 	"reflect"
+	"testing"
 )
 
 func TestNewArray(t *testing.T) {
@@ -30,7 +30,7 @@ func TestArray_Data(t *testing.T) {
 		dim           = []uint{16, 37}
 		itemSize uint = 4
 	)
-	array := NewArray(itemSize, )
+	array := NewArray(itemSize)
 	defer array.Free()
 
 	if array.Pointer() == nil {
@@ -102,7 +102,7 @@ func TestArray_Clear(t *testing.T) {
 
 func TestArray_Free(t *testing.T) {
 	var (
-		dim      = []uint{16, 37,2}
+		dim           = []uint{16, 37, 2}
 		itemSize uint = 4
 	)
 
@@ -153,7 +153,7 @@ func TestArray_Free(t *testing.T) {
 
 func TestArray_WithPool(t *testing.T) {
 	var (
-		dim      = []uint{16}
+		dim           = []uint{16}
 		itemSize uint = 4
 	)
 

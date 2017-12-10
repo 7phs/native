@@ -30,7 +30,7 @@ func NewTArray(len uint) *TArray {
 	return NewTArrayExt(nil, len)
 }
 
-func NewTArrayInterface(pool native.IPool, dim ... uint) interface{} {
+func NewTArrayInterface(pool native.IPool, dim ...uint) interface{} {
 	return NewTArrayExt(pool, dim[0])
 }
 

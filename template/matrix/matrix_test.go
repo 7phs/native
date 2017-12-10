@@ -1,8 +1,8 @@
 package matrix
 
 import (
-	"testing"
 	"reflect"
+	"testing"
 
 	"bitbucket.org/7phs/native"
 )
@@ -88,21 +88,21 @@ func TestWithTMatrix(t *testing.T) {
 func TestTMatrix_Clear(t *testing.T) {
 	matrix := NewTMatrix(16, 37)
 
-	if len := len(matrix.Slice()); len==0 {
+	if len := len(matrix.Slice()); len == 0 {
 		t.Error("failed to init tmatrix. Slice length is 0")
 	}
 
-	if len := len(matrix.Marshal()); len==0 {
+	if len := len(matrix.Marshal()); len == 0 {
 		t.Error("failed to init tmatrix. Marshaled slice length is 0")
 	}
 
 	matrix.Free()
 
-	if len := len(matrix.Slice()); len!=0 {
+	if len := len(matrix.Slice()); len != 0 {
 		t.Error("failed to clear tmatrix. Slice length is ", len)
 	}
 
-	if len := len(matrix.Marshal()); len!=0 {
+	if len := len(matrix.Marshal()); len != 0 {
 		t.Error("failed to clear tmatrix. Marshaled slice length is ", len)
 	}
 }

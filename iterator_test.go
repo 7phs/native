@@ -84,7 +84,7 @@ func BenchmarkUintContainer_Len(b *testing.B) {
 	b.Run("native iterator", func(b *testing.B) {
 		count := 0
 
-		for i:=0;i<100;i++ {
+		for i := 0; i < 100; i++ {
 			for _, number := range data {
 				if number > 0 && number%2 == 0 {
 					count++
@@ -92,7 +92,7 @@ func BenchmarkUintContainer_Len(b *testing.B) {
 			}
 		}
 
-		if count<10 {
+		if count < 10 {
 			b.Error("failed to native calc length", count)
 		}
 	})
@@ -101,13 +101,13 @@ func BenchmarkUintContainer_Len(b *testing.B) {
 	b.Run("native iterator", func(b *testing.B) {
 		count := 0
 
-		for i:=0;i<100;i++ {
+		for i := 0; i < 100; i++ {
 			count += iterator.
 				Filter(func(index int, number uint) bool { return number > 0 && number%2 == 0 }).
 				Len()
 		}
 
-		if count<10 {
+		if count < 10 {
 			b.Error("failed to iterative calc length", count)
 		}
 	})

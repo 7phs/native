@@ -16,11 +16,11 @@ type testNativeRec struct {
 	pool IPool
 }
 
-func newTestNativeRec(data string, itemSize uint, dim ... uint) *testNativeRec {
+func newTestNativeRec(data string, itemSize uint, dim ...uint) *testNativeRec {
 	return newTestNativeRecExt(nil, data, itemSize, dim...)
 }
 
-func newTestNativeRecExt(pool IPool, data string, itemSize uint, dim ... uint) *testNativeRec {
+func newTestNativeRecExt(pool IPool, data string, itemSize uint, dim ...uint) *testNativeRec {
 	return &testNativeRec{
 		data:     data,
 		itemSize: itemSize,
@@ -162,10 +162,10 @@ func TestPoolManager_GetPut(t *testing.T) {
 		itemSize1 uint = 16
 		itemSize2 uint = 32
 	)
-	manager1 := NewPoolManager(itemSize1, func(pool IPool, dim ... uint) interface{} {
+	manager1 := NewPoolManager(itemSize1, func(pool IPool, dim ...uint) interface{} {
 		return newTestNativeRecExt(pool, testKeyData(itemSize1, dim[0]), itemSize1, dim...)
 	})
-	manager2 := NewPoolManager(itemSize2, func(pool IPool, dim ... uint) interface{} {
+	manager2 := NewPoolManager(itemSize2, func(pool IPool, dim ...uint) interface{} {
 		return newTestNativeRecExt(pool, testKeyData(itemSize2, dim[0]), itemSize2, dim...)
 	})
 
@@ -184,7 +184,7 @@ func testKeyData(itemSize, len uint) string {
 	return fmt.Sprintf("Key%d_%d:create", itemSize, len)
 }
 
-func testPoolInit(manager *PoolManager, prefix string, itemCount uint, itemSize uint, dims ... []uint) []*testNativeRec {
+func testPoolInit(manager *PoolManager, prefix string, itemCount uint, itemSize uint, dims ...[]uint) []*testNativeRec {
 	var records []*testNativeRec
 
 	for k := 0; k < int(itemCount); k++ {
@@ -207,7 +207,7 @@ func testPoolInit(manager *PoolManager, prefix string, itemCount uint, itemSize 
 	return records
 }
 
-func generateExpected(prefix string, itemCount uint, itemSize uint, dims ... []uint) (data map[string]bool) {
+func generateExpected(prefix string, itemCount uint, itemSize uint, dims ...[]uint) (data map[string]bool) {
 	data = make(map[string]bool)
 
 	for _, dim := range dims {
@@ -275,7 +275,7 @@ func TestPoolManager_FreeData(t *testing.T) {
 		dims           = [][]uint{{1}, {2}, {4}, {8}}
 		prefix         = "get"
 	)
-	manager := NewPoolManager(itemSize, func(pool IPool, dim ... uint) interface{} {
+	manager := NewPoolManager(itemSize, func(pool IPool, dim ...uint) interface{} {
 		return newTestNativeRecExt(pool, testKeyData(itemSize, dim[0]), itemSize, dim...)
 	})
 
