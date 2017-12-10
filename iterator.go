@@ -3,82 +3,32 @@ package native
 type State = int
 
 const (
-	NEXT State = iota + 1
+	NEXT   State = iota + 1
 	SKIP
 	FINISH
 )
 
-type Container struct {
+type MapContainer struct {
 	data map[string]bool
-	Next func(key string, value bool) (string, bool, State)
+
+	Next func(index string, value bool) (string, bool, State)
 }
 
-func (o *Container) Len() (count int) {
-	for key, value := range o.data {
-		_, _, finish := o.Next(key, value)
-		switch finish {
-		case SKIP:
-			continue
-		case FINISH:
-			return
-		case NEXT:
-		}
-
-		count++
+func MapIterator(data map[string]bool) *MapContainer {
+	return &MapContainer{
+		data: data,
+		Next: func(index string, value bool) (string, bool, State) {
+			return index, value, NEXT
+		},
 	}
-
-	return
 }
 
-func (o *Container) Collect() (result map[string]bool) {
-	result = make(map[string]bool)
-
-	for key, value := range o.data {
-		key, value, finish := o.Next(key, value)
-		switch finish {
-		case SKIP:
-			continue
-		case FINISH:
-			return
-		case NEXT:
-		}
-
-		result[key] = value
-	}
-
-	return
-}
-
-func (o *Container) Min() (string, bool) {
-	return "", false
-}
-
-func (o *Container) Max() (string, bool) {
-	return "", false
-}
-
-func (o *Container) Fold(count int, f func(int, string, bool) int) int {
-	return count
-}
-
-func (o *Container) All(func(int, string) bool) bool {
-	return false
-}
-
-func (o *Container) Any(func(int, string) bool) bool {
-	return false
-}
-
-/*
- */
-func (o *Container) Filter(f func(string, bool) bool) *Container {
+func (o *MapContainer) Filter(f func(string, bool) bool) *MapContainer {
 	next := o.Next
 
-	o.Next = func(k string, v bool) (key string, value bool, finish State) {
-		key, value, finish = next(k, v)
-
-		if finish == NEXT && !f(key, value) {
-			finish = SKIP
+	o.Next = func(i string, v bool) (index string, value bool, state State) {
+		if index, value, state = next(i, v); state == NEXT && !f(index, value) {
+			state = SKIP
 		}
 
 		return
@@ -87,20 +37,14 @@ func (o *Container) Filter(f func(string, bool) bool) *Container {
 	return o
 }
 
-func (o *Container) ForEach(func(string, bool) (string, bool, State)) *Container {
-	return o
-}
-
-func (o *Container) Take(count int) *Container {
+func (o *MapContainer) Take(count int) *MapContainer {
 	next := o.Next
 	counter := 0
 
-	o.Next = func(k string, v bool) (key string, value bool, finish State) {
-		key, value, finish = next(k, v)
-
-		if finish == NEXT {
+	o.Next = func(i string, v bool) (index string, value bool, state State) {
+		if index, value, state = next(i, v); state == NEXT {
 			if counter >= count {
-				finish = FINISH
+				state = FINISH
 			}
 
 			counter++
@@ -112,18 +56,116 @@ func (o *Container) Take(count int) *Container {
 	return o
 }
 
-/*
- * ????
- */
-func (o *Container) Zip(func(string, bool) bool) *Container {
+func (o *MapContainer) Range(fn func(index string, value bool)) {
+	for index, value := range o.data {
+		switch index, value, status := o.Next(index, value); status {
+		case SKIP:
+			continue
+		case FINISH:
+			return
+		case NEXT:
+			fn(index, value)
+		}
+	}
+}
+
+func (o *MapContainer) Len() (count int) {
+	o.Range(func(_ string, _ bool) {
+		count++
+	})
+
+	return
+}
+
+type UintContainer struct {
+	data []uint
+
+	Next func(index int, value uint) (int, uint, State)
+}
+
+func UintIterator(data []uint) *UintContainer {
+	return &UintContainer{
+		data: data,
+		Next: func(index int, value uint) (int, uint, State) {
+			return index, value, NEXT
+		},
+	}
+}
+
+func (o *UintContainer) Filter(f func(int, uint) bool) *UintContainer {
+	next := o.Next
+
+	o.Next = func(i int, v uint) (index int, value uint, state State) {
+		if index, value, state = next(i, v); state == NEXT && !f(index, value) {
+			state = SKIP
+		}
+
+		return
+	}
+
 	return o
 }
 
-func Iterator(data map[string]bool) *Container {
-	return &Container{
-		data: data,
-		Next: func(key string, value bool) (string, bool, State) {
-			return key, value, NEXT
-		},
+func (o *UintContainer) Take(count int) *UintContainer {
+	next := o.Next
+	counter := 0
+
+	o.Next = func(i int, v uint) (index int, value uint, state State) {
+		if index, value, state = next(i, v); state == NEXT {
+			if counter >= count {
+				state = FINISH
+			}
+
+			counter++
+		}
+
+		return
 	}
+
+	return o
+}
+
+func (o *UintContainer) Range(fn func(index int, value uint)) {
+	for index, value := range o.data {
+		switch index, value, status := o.Next(index, value); status {
+		case SKIP:
+			continue
+		case FINISH:
+			return
+		case NEXT:
+			fn(index, value)
+		}
+	}
+}
+
+func (o *UintContainer) Mul() (mul uint) {
+	mul = 1
+
+	o.Range(func(index int, value uint) {
+		mul *= value
+	})
+
+	return
+}
+
+func (o *UintContainer) Len() (count int) {
+	o.Range(func(_ int, _ uint) {
+		count++
+	})
+
+	return
+}
+
+func Range(begin, end int) <-chan int {
+	yield := make(chan int)
+
+	go func() {
+		for ; begin < end; begin++ {
+			yield <- begin
+		}
+
+		close(yield)
+	}()
+
+	return yield
 }

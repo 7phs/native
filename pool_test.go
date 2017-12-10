@@ -7,22 +7,24 @@ import (
 )
 
 type testNativeRec struct {
-	len      uint
-	itemSize uint
 	data     string
+	itemSize uint
+	dim      []uint
 
-	pool *Pool
+	free bool
+
+	pool IPool
 }
 
-func newTestNativeRec(len, itemSize uint, data string) *testNativeRec {
-	return newTestNativeRecExt(len, itemSize, data, nil)
+func newTestNativeRec(data string, itemSize uint, dim ... uint) *testNativeRec {
+	return newTestNativeRecExt(nil, data, itemSize, dim...)
 }
 
-func newTestNativeRecExt(len, itemSize uint, data string, pool *Pool) *testNativeRec {
+func newTestNativeRecExt(pool IPool, data string, itemSize uint, dim ... uint) *testNativeRec {
 	return &testNativeRec{
-		len:      len,
-		itemSize: itemSize,
 		data:     data,
+		itemSize: itemSize,
+		dim:      dim,
 		pool:     pool,
 	}
 }
@@ -31,8 +33,8 @@ func (o *testNativeRec) Add(str string) {
 	o.data = strings.Join([]string{o.data, str}, ";")
 }
 
-func (o *testNativeRec) Len() uint {
-	return o.len
+func (o *testNativeRec) Dim() []uint {
+	return o.dim
 }
 
 func (o *testNativeRec) ItemSize() uint {
@@ -46,21 +48,28 @@ func (o *testNativeRec) ClearData() PoolData {
 
 func (o *testNativeRec) FreeData() {
 	o.Add("free")
+	o.free = true
 }
 
 func TestPool(t *testing.T) {
-	var itemSize uint = 16
+	var (
+		dim           = []uint{16}
+		itemSize uint = 4
+	)
 
-	NewPool(itemSize, func(len uint, pool *Pool) interface{} {
-		return newTestNativeRecExt(itemSize, len, "", pool)
+	NewPool(func(pool IPool) interface{} {
+		return newTestNativeRecExt(pool, "", itemSize, dim...)
 	})
 }
 
-func TestGetPut(t *testing.T) {
-	var itemSize uint = 16
+func TestPool_GetPut(t *testing.T) {
+	var (
+		dim           = []uint{16}
+		itemSize uint = 4
+	)
 
-	pool := NewPool(itemSize, func(len uint, pool *Pool) interface{} {
-		return newTestNativeRecExt(itemSize, len, "create", pool)
+	pool := NewPool(func(pool IPool) interface{} {
+		return newTestNativeRecExt(pool, "create", itemSize, dim...)
 	})
 
 	func() {
@@ -77,8 +86,8 @@ func TestGetPut(t *testing.T) {
 	exist1 := (pool.Get()).(*testNativeRec).data
 	exist2 := (pool.Get()).(*testNativeRec).data
 
-	expected1 := strings.Join([]string{"create", "clear", "processed", "clear"}, ";")
-	expected2 := strings.Join([]string{"create", "clear", "processed2", "clear"}, ";")
+	expected1 := strings.Join([]string{"create", "processed", "clear"}, ";")
+	expected2 := strings.Join([]string{"create", "processed2", "clear"}, ";")
 
 	if exist1 != expected1 && exist1 != expected2 {
 		t.Error("an object life cicle is different expected. 1: ", exist1, " != ", expected1, " or ", expected2)
@@ -89,35 +98,83 @@ func TestGetPut(t *testing.T) {
 	}
 
 	exist3 := (pool.Get()).(*testNativeRec).data
-	expected3 := "create;clear"
+	expected3 := "create"
 
 	if exist3 != expected3 {
 		t.Error("an object life cicle is different expected. 3: ", exist3, " != ", expected3)
 	}
 }
 
-func TestPoolManager(t *testing.T) {
-	NewPoolManager(1, func(uint, *Pool) interface{} { return 5 })
+func TestPool_FreeData(t *testing.T) {
+	var (
+		dim              = []uint{4}
+		itemSize    uint = 16
+		recordCount      = 10
+	)
+
+	pool := NewPool(func(pool IPool) interface{} {
+		return newTestNativeRecExt(pool, "create", itemSize, dim...)
+	})
+
+	var records []*testNativeRec
+
+	for range Range(0, recordCount) {
+		records = append(records, func() *testNativeRec {
+			rec := pool.Get().(*testNativeRec)
+			defer pool.Put(rec)
+
+			return rec
+		}())
+	}
+
+	pool.FreeData()
+
+	// check arraypool after free
+	func() {
+		pool.Put(newTestNativeRecExt(pool, "create", itemSize, dim...))
+
+		if pool.Get() != nil {
+			t.Error("get data after free data")
+		}
+
+		pool.FreeData()
+	}()
+
+	existCount := 0
+	for _, rec := range records {
+		if rec.free {
+			existCount++
+		}
+	}
+
+	if existCount != recordCount {
+		t.Error("failed to free all records. Freed is ", existCount, ", but expected is ", recordCount)
+	}
 }
 
-func TestPoolManagerGetPut(t *testing.T) {
+func TestPoolManager(t *testing.T) {
+	NewPoolManager(1, func(IPool, ...uint) interface{} { return 5 })
+}
+
+func TestPoolManager_GetPut(t *testing.T) {
 	var (
+		dim            = []uint{16}
 		itemSize1 uint = 16
 		itemSize2 uint = 32
 	)
-	manager1 := NewPoolManager(itemSize1, func(len uint, pool *Pool) interface{} {
-		return newTestNativeRecExt(len, itemSize1, testKeyData(itemSize1, len), pool)
+	manager1 := NewPoolManager(itemSize1, func(pool IPool, dim ... uint) interface{} {
+		return newTestNativeRecExt(pool, testKeyData(itemSize1, dim[0]), itemSize1, dim...)
 	})
-	manager2 := NewPoolManager(itemSize2, func(len uint, pool *Pool) interface{} {
-		return newTestNativeRecExt(len, itemSize2, testKeyData(itemSize2, len), pool)
+	manager2 := NewPoolManager(itemSize2, func(pool IPool, dim ... uint) interface{} {
+		return newTestNativeRecExt(pool, testKeyData(itemSize2, dim[0]), itemSize2, dim...)
 	})
 
-	rec := manager1.Get(32).(*testNativeRec)
+	rec := manager1.Get(dim...).(*testNativeRec)
 	if err := manager1.Put(rec); err != nil {
-		t.Error("failed to put into pool right record with", err)
+		t.Error("failed to put into arraypool right record with", err)
 	}
 
-	rec2 := manager2.Get(32).(*testNativeRec)
+	rec2 := manager2.Get(dim...).(*testNativeRec)
 	if err := manager1.Put(rec2); err == nil {
 		t.Error("failed to check record item size and got no error")
 	}
@@ -127,11 +184,34 @@ func testKeyData(itemSize, len uint) string {
 	return fmt.Sprintf("Key%d_%d:create", itemSize, len)
 }
 
-func generateExpected(itemSize uint, lens []uint, itemCount uint, prefix string) (data map[string]bool) {
+func testPoolInit(manager *PoolManager, prefix string, itemCount uint, itemSize uint, dims ... []uint) []*testNativeRec {
+	var records []*testNativeRec
+
+	for k := 0; k < int(itemCount); k++ {
+		for i, dim := range dims {
+			func() {
+				for j := 1; j <= int(itemCount); j++ {
+					rec := (manager.Get(dim...)).(*testNativeRec)
+					defer manager.Put(rec)
+
+					rec.Add(fmt.Sprint(prefix, i+1, j))
+
+					if k == 0 {
+						records = append(records, rec)
+					}
+				}
+			}()
+		}
+	}
+
+	return records
+}
+
+func generateExpected(prefix string, itemCount uint, itemSize uint, dims ... []uint) (data map[string]bool) {
 	data = make(map[string]bool)
 
-	for _, len := range lens {
-		id := testKeyData(itemSize, len) + ";clear"
+	for _, dim := range dims {
+		id := testKeyData(itemSize, dim[0])
 
 		for i := 1; i <= int(itemCount); i++ {
 			key := id
@@ -147,39 +227,30 @@ func generateExpected(itemSize uint, lens []uint, itemCount uint, prefix string)
 	return
 }
 
-func TestPoolManagerGetWithVariants(t *testing.T) {
-	var itemSize uint = 16
-	manager := NewPoolManager(itemSize, func(len uint, pool *Pool) interface{} {
-		return newTestNativeRecExt(len, itemSize, testKeyData(itemSize, len), pool)
+func TestPoolManager_GetWithVariants(t *testing.T) {
+	var (
+		itemSize  uint = 16
+		itemCount uint = 4
+		dims           = [][]uint{{1}, {2}, {4}, {8}}
+		prefix         = "get"
+	)
+	manager := NewPoolManager(itemSize, func(pool IPool, dim ...uint) interface{} {
+		return newTestNativeRecExt(pool, testKeyData(itemSize, dim[0]), itemSize, dim...)
 	})
-	var itemCount uint = 4
-	lens := []uint{1, 2, 4, 8}
-	prefix := "get"
 
 	// stage 1: generate data
-	for k := 0; k < int(itemCount); k++ {
-		for i, len := range lens {
-			func() {
-				for j := 1; j <= int(itemCount); j++ {
-					rec := (manager.Get(len)).(*testNativeRec)
-					defer manager.Put(rec)
-
-					rec.Add(fmt.Sprint(prefix, i+1, j))
-				}
-			}()
-		}
-	}
+	testPoolInit(manager, prefix, itemCount, itemSize, dims...)
 	// stage 2: prepare expected record lifecicle data
-	expected := generateExpected(itemSize, lens, itemCount, prefix)
+	expected := generateExpected(prefix, itemCount, itemSize, dims...)
 
-	expected_len := len(lens) * int(itemCount)
-	if exist_len := len(expected); exist_len != expected_len {
-		t.Error("failed to generate all possible objects lifecycle. Got ", exist_len, " options, but expected is ", expected_len)
+	expectedLen := len(dims) * int(itemCount)
+	if existLen := len(expected); existLen != expectedLen {
+		t.Error("failed to generate all possible objects lifecycle. Got ", existLen, " options, but expected is ", expectedLen)
 	}
 	// stage 3: compare data with pools
-	for _, len := range lens {
+	for _, dim := range dims {
 		func() {
-			rec := (manager.Get(len)).(*testNativeRec)
+			rec := (manager.Get(dim...)).(*testNativeRec)
 			defer manager.Put(rec)
 
 			if _, ok := expected[rec.data]; ok {
@@ -188,13 +259,53 @@ func TestPoolManagerGetWithVariants(t *testing.T) {
 		}()
 	}
 	// stage 4: count catching data
-	existCount := Iterator(expected).
-		Filter(func(key string, item bool) bool {
-			return item
-		}).
+	existCount := MapIterator(expected).
+		Filter(func(_ string, value bool) bool { return value }).
 		Len()
 	// stage 5: test it
-	if expectedCount := len(lens); existCount != expectedCount {
-		t.Error("failed to check updating record in the pool manager. Changed ", existCount, " record, but expected ", expectedCount)
+	if expectedCount := len(dims); existCount != expectedCount {
+		t.Error("failed to check updating record in the arraypool manager. Changed ", existCount, " record, but expected ", expectedCount)
 	}
+}
+
+func TestPoolManager_FreeData(t *testing.T) {
+	var (
+		itemSize  uint = 16
+		itemCount uint = 4
+		dims           = [][]uint{{1}, {2}, {4}, {8}}
+		prefix         = "get"
+	)
+	manager := NewPoolManager(itemSize, func(pool IPool, dim ... uint) interface{} {
+		return newTestNativeRecExt(pool, testKeyData(itemSize, dim[0]), itemSize, dim...)
+	})
+
+	// generate data
+	records := testPoolInit(manager, prefix, itemCount, itemSize, dims...)
+
+	manager.FreeData()
+
+	// check arraypool after free
+	func() {
+		dim := dims[1]
+
+		manager.Put(newTestNativeRec("create", itemSize, dim...))
+
+		if manager.Get(dim...) != nil {
+			t.Error("get data after free data")
+		}
+
+		manager.FreeData()
+	}()
+
+	existCount := 0
+	for _, rec := range records {
+		if rec.free {
+			existCount++
+		}
+	}
+
+	if existCount != len(records) {
+		t.Error("failed to free all records. Freed is ", existCount, ", but expected is ", len(records))
+	}
+
 }

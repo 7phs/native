@@ -19,20 +19,24 @@ import "unsafe"
 
 type Array struct {
 	data     *C.void
-	len      uint
+	dim      []uint
+	size     uint
 	itemSize uint
 
-	pool *Pool
+	pool IPool
 }
 
-func NewArray(len, itemSize uint) *Array {
-	return NewArrayExt(len, itemSize, nil)
+func NewArray(itemSize uint, dim ...uint) *Array {
+	return NewArrayExt(nil, itemSize, dim...)
 }
 
-func NewArrayExt(len, itemSize uint, pool *Pool) *Array {
+func NewArrayExt(pool IPool, itemSize uint, dim ...uint) *Array {
+	size := UintIterator(dim).Mul()
+
 	return &Array{
-		data:     (*C.void)(C.native_malloc(C.size_t(len), C.size_t(itemSize))),
-		len:      len,
+		data:     (*C.void)(C.native_malloc(C.size_t(size), C.size_t(itemSize))),
+		dim:      dim,
+		size:     size,
 		itemSize: itemSize,
 		pool:     pool,
 	}
@@ -46,8 +50,12 @@ func (o *Array) Pointer() unsafe.Pointer {
 	return unsafe.Pointer(o.data)
 }
 
-func (o *Array) Len() uint {
-	return o.len
+func (o *Array) Dim() []uint {
+	return o.dim
+}
+
+func (o *Array) Size() uint {
+	return o.size
 }
 
 func (o *Array) ItemSize() uint {
@@ -55,7 +63,7 @@ func (o *Array) ItemSize() uint {
 }
 
 func (o *Array) Clear() *Array {
-	C.native_clear(o.Pointer(), C.size_t(o.len), C.size_t(o.itemSize))
+	C.native_clear(o.Pointer(), C.size_t(o.size), C.size_t(o.itemSize))
 
 	return o
 }
@@ -64,9 +72,17 @@ func (o *Array) ClearData() PoolData {
 	return o.Clear()
 }
 
+func (o *Array) HasPool() bool {
+	return o.pool != nil
+}
+
+func (o *Array) Pool() IPool {
+	return o.pool
+}
+
 func (o *Array) Free() {
-	if o.pool != nil {
-		o.pool.Put(o)
+	if o.HasPool() {
+		o.Pool().Put(o)
 	} else {
 		o.FreeData()
 	}
@@ -80,6 +96,7 @@ func (o *Array) FreeData() {
 	C.native_free(unsafe.Pointer(o.data))
 
 	o.data = nil
-	o.len = 0
+	o.dim = []uint{}
+	o.size = 0
 	o.itemSize = 0
 }

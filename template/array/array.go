@@ -1,7 +1,7 @@
 package array
 
 import "C"
-import "bitbucket.org/7phs/fastgotext/wrapper/native"
+import "bitbucket.org/7phs/native"
 
 // template type TArray(A, B, BSize)
 type A int
@@ -13,27 +13,29 @@ type TArray struct {
 	native.Array
 }
 
-func WithTArray(data []A) *TArray {
-	array := NewTArray(uint(len(data)))
+type TArrayRec = B
+
+func WithTArray(data []A) (array *TArray) {
+	array = NewTArray(uint(len(data)))
 
 	slice := array.Slice()
 	for i, v := range data {
 		slice[i] = B(v)
 	}
 
-	return array
+	return
 }
 
 func NewTArray(len uint) *TArray {
-	return &TArray{
-		Array: *native.NewArray(len, BSize),
-	}
+	return NewTArrayExt(nil, len)
 }
 
-func NewTArrayExt(len uint, pool *native.Pool) *TArray {
-	return &TArray{
-		Array: *native.NewArrayExt(len, BSize, pool),
-	}
+func NewTArrayInterface(pool native.IPool, dim ... uint) interface{} {
+	return NewTArrayExt(pool, dim[0])
+}
+
+func NewTArrayExt(pool native.IPool, len uint) *TArray {
+	return &TArray{Array: *native.NewArrayExt(pool, BSize, len)}
 }
 
 func (o *TArray) Slice() []B {
@@ -41,7 +43,9 @@ func (o *TArray) Slice() []B {
 		return []B{}
 	}
 
-	return (*[1 << 30]B)(o.Pointer())[:o.Len():o.Len()]
+	len := o.Dim()[0]
+
+	return (*[1 << 30]B)(o.Pointer())[:len:len]
 }
 
 func (o *TArray) Marshal() []A {
@@ -49,11 +53,19 @@ func (o *TArray) Marshal() []A {
 		return []A{}
 	}
 
-	res := make([]A, 0, o.Len())
+	res := make([]A, 0, o.Dim()[0])
 
 	for _, v := range o.Slice() {
 		res = append(res, A(v))
 	}
 
 	return res
+}
+
+func (o *TArray) Free() {
+	if o.HasPool() {
+		o.Pool().Put(o)
+	} else {
+		o.FreeData()
+	}
 }

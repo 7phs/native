@@ -13,97 +13,142 @@ const (
 
 /*
  */
-type PoolManager struct {
-	sync.Map
-
-	itemSize uint
-	new      func(uint, *Pool) interface{}
-}
-
-func NewPoolManager(itemSize uint, new func(uint, *Pool) interface{}) *PoolManager {
-	return &PoolManager{
-		itemSize: itemSize,
-		new:      new,
-	}
-}
-
-func (o *PoolManager) getPool(len uint) *Pool {
-	if pool, ok := o.Load(len); ok {
-		return pool.(*Pool)
-	}
-
-	pool, _ := o.LoadOrStore(len, NewPool(len, o.new))
-
-	return pool.(*Pool)
-}
-
-func (o *PoolManager) Get(len uint) interface{} {
-	return o.getPool(len).Get()
-}
-
-func (o *PoolManager) Put(data PoolData) (err error) {
-	if data.ItemSize() != o.itemSize {
-		err = os.ErrInvalid
-		return
-	}
-
-	o.getPool(data.Len()).Put(data)
-
-	return
-}
-
-/*
- */
 type PoolData interface {
 	ItemSize() uint
-	Len() uint
+	Dim() []uint
 	ClearData() PoolData
 	FreeData()
 }
 
 /*
  */
-type Pool struct {
-	sync.Pool
+type IPool interface {
+	Get() PoolData
+	Put(PoolData)
+	FreeData()
+}
 
+/*
+*/
+type Status struct {
 	status int32
 }
 
-func NewPool(len uint, new func(itemSize uint, pool *Pool) interface{}) (pool *Pool) {
-	pool = &Pool{
-		status: POOL_STATUS_NORMAL,
-	}
-	pool.New = func() interface{} {
-		if pool.isFinish() {
-			return nil
-		}
+func (o *Status) IsFinish() bool {
+	return atomic.LoadInt32(&o.status) == POOL_STATUS_FINISH
+}
 
-		return new(len, pool)
+func (o *Status) setFinish() bool {
+	return atomic.CompareAndSwapInt32(&o.status, POOL_STATUS_NORMAL, POOL_STATUS_FINISH)
+}
+
+/*
+ */
+type PoolManager struct {
+	sync.Map
+	Status
+
+	itemSize uint
+	new      func(IPool, ...uint) interface{}
+}
+
+func NewPoolManager(itemSize uint, new func(IPool, ...uint) interface{}) *PoolManager {
+	return &PoolManager{
+		itemSize: itemSize,
+		new:      new,
+	}
+}
+
+func (o *PoolManager) key(dim ...uint) (key uint) {
+	key = 1
+	for _, d := range dim {
+		key *= d
 	}
 	return
 }
 
-func (o *Pool) isFinish() bool {
-	return atomic.LoadInt32(&o.status) == POOL_STATUS_FINISH
-}
+func (o *PoolManager) getPool(dim ...uint) IPool {
+	key := o.key(dim...)
 
-func (o *Pool) setFinish() bool {
-	return atomic.CompareAndSwapInt32(&o.status, POOL_STATUS_NORMAL, POOL_STATUS_FINISH)
-}
-
-func (o *Pool) Get() PoolData {
-	if o.isFinish() {
-		return nil
+	if pool, ok := o.Load(key); ok {
+		return pool.(IPool)
 	}
 
-	return o.Pool.Get().(PoolData).ClearData()
+	pool, _ := o.LoadOrStore(key, NewPool(func(pool IPool) interface{} {
+		return o.new(pool, dim...)
+	}))
+
+	return pool.(IPool)
 }
 
-func (o *Pool) Put(data PoolData) {
-	if o.isFinish() {
+func (o *PoolManager) Get(dim ...uint) interface{} {
+	return o.getPool(dim...).Get()
+}
+
+func (o *PoolManager) Put(data PoolData) (err error) {
+	if o.IsFinish() {
 		return
 	}
 
+	if data.ItemSize() != o.itemSize {
+		err = os.ErrInvalid
+		return
+	}
+
+	o.getPool(data.Dim()...).Put(data)
+
+	return
+}
+
+func (o *PoolManager) FreeData() {
+	if !o.setFinish() {
+		return
+	}
+
+	o.Range(func(_, value interface{}) bool {
+		value.(IPool).FreeData()
+
+		return true
+	})
+}
+
+/*
+ */
+type Pool struct {
+	sync.Pool
+	Status
+
+	status int32
+}
+
+func NewPool(new func(pool IPool) interface{}) (pool *Pool) {
+	pool = &Pool{
+		status: POOL_STATUS_NORMAL,
+	}
+	pool.New = func() interface{} {
+		if pool.IsFinish() {
+			return nil
+		}
+
+		return new(pool)
+	}
+	return
+}
+
+func (o *Pool) Get() PoolData {
+	if o.IsFinish() {
+		return nil
+	}
+
+	return o.Pool.Get().(PoolData)
+}
+
+func (o *Pool) Put(data PoolData) {
+	if o.IsFinish() {
+		return
+	}
+
+	data.ClearData()
 	o.Pool.Put(data)
 }
 
@@ -113,11 +158,10 @@ func (o *Pool) FreeData() {
 	}
 
 	for {
-
-		if data := o.Pool.Get().(PoolData); data == nil {
+		if data := o.Pool.Get(); data == nil {
 			break
 		} else {
-			data.FreeData()
+			data.(PoolData).FreeData()
 		}
 	}
 }
