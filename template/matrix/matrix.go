@@ -15,6 +15,10 @@ type TMatrix struct {
 
 type TMatrixRec = BM
 
+func TMatrixPoolKey(dim ...uint) uint {
+	return dim[0] * dim[1]
+}
+
 func WithTMatrix(data [][]AM) (matrix *TMatrix) {
 	var (
 		rowLen = uint(len(data))

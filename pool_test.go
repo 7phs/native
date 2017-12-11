@@ -51,6 +51,10 @@ func (o *testNativeRec) FreeData() {
 	o.free = true
 }
 
+func testPoolManagerKey(dim ...uint) uint {
+	return dim[0]
+}
+
 func TestPool(t *testing.T) {
 	var (
 		dim           = []uint{16}
@@ -167,7 +171,7 @@ func TestPoolManager_GetPut(t *testing.T) {
 	})
 	manager2 := NewPoolManager(itemSize2, func(pool IPool, dim ...uint) interface{} {
 		return newTestNativeRecExt(pool, testKeyData(itemSize2, dim[0]), itemSize2, dim...)
-	})
+	}).SetKey(testPoolManagerKey)
 
 	rec := manager1.Get(dim...).(*testNativeRec)
 	if err := manager1.Put(rec); err != nil {

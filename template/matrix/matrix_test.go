@@ -7,6 +7,12 @@ import (
 	"bitbucket.org/7phs/native"
 )
 
+func TestTMatrixPoolKey(t *testing.T) {
+	if key := TMatrixPoolKey(23, 45, 64, 48); key != 23*45 {
+		t.Error("failed to get multiplicayion of the first two dimentions in a list. Got ", key, ", but expected is ", 23*45)
+	}
+}
+
 func TestNewTMatrix(t *testing.T) {
 	array := NewTMatrix(16, 37)
 	defer array.Free()

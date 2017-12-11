@@ -15,6 +15,10 @@ type TArray struct {
 
 type TArrayRec = B
 
+func TArrayPoolKey(dim ...uint) uint {
+	return dim[0]
+}
+
 func WithTArray(data []A) (array *TArray) {
 	array = NewTArray(uint(len(data)))
 

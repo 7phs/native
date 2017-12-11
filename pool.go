@@ -44,27 +44,37 @@ func (o *Status) setFinish() bool {
 
 /*
  */
+func PoolManagerDefaultKey(dim ...uint) (key uint) {
+	key = 1
+	for _, d := range dim {
+		key *= d
+	}
+	return
+}
+
+/*
+ */
 type PoolManager struct {
 	sync.Map
 	Status
 
 	itemSize uint
+	key      func(...uint) uint
 	new      func(IPool, ...uint) interface{}
 }
 
 func NewPoolManager(itemSize uint, new func(IPool, ...uint) interface{}) *PoolManager {
 	return &PoolManager{
 		itemSize: itemSize,
+		key:      PoolManagerDefaultKey,
 		new:      new,
 	}
 }
 
-func (o *PoolManager) key(dim ...uint) (key uint) {
-	key = 1
-	for _, d := range dim {
-		key *= d
-	}
-	return
+func (o *PoolManager) SetKey(key func(...uint) uint) *PoolManager {
+	o.key = key
+
+	return o
 }
 
 func (o *PoolManager) getPool(dim ...uint) IPool {

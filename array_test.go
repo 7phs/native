@@ -50,53 +50,57 @@ func TestArray_Data(t *testing.T) {
 	}
 }
 
-func sliceTestArray(array *Array) []int32 {
-	return (*[1 << 30]int32)(array.Pointer())[:array.Size():array.Size()]
+func sliceTestArray(array *Array) []int8 {
+	sz := array.Size() * array.itemSize
+
+	return (*[1 << 30]int8)(array.Pointer())[:sz:sz]
 }
 
-func generateTestDataArray(slice []int32) []int32 {
+func generateTestDataArray(slice []int8) []int8 {
 	for i := range slice {
-		slice[i] = int32(i + 3)
+		slice[i] = int8(int32(i+3) % 256)
 	}
 
 	return slice
 }
 
-func sumTestArray(slice []int32) int32 {
+func sumTestArray(slice []int8) int32 {
 	var (
 		sum int32 = 0
 	)
 	for _, v := range slice {
-		sum += v
+		sum += int32(v)
 	}
 	return sum
 }
 
 func TestArray_Clear(t *testing.T) {
 	var (
-		len      uint = 16
-		itemSize uint = 4
+		expectedSum = []int32{3, 7, 18, 168, 738, 2208, -256}
+		len         = uint(1)
 	)
 
-	array := NewArray(itemSize, len)
-	defer array.Free()
+	for i, itemSize := range []uint{1, 2, 4, 16, 36, 64, 512} {
+		array := NewArray(itemSize, len)
 
-	slice := sliceTestArray(array)
-	sum := sumTestArray(generateTestDataArray(slice))
-	var expectedSum int32 = 168
+		slice := sliceTestArray(array)
+		sum := sumTestArray(generateTestDataArray(slice))
 
-	if sum != expectedSum {
-		t.Error("failed to set some values. Sum is", sum, ", but expected is", expectedSum)
-	}
+		if sum != expectedSum[i] {
+			t.Error("failed to set some values. Sum is", sum, ", but expected is", expectedSum[i])
+		}
 
-	array.ClearData()
+		array.ClearData()
 
-	if sum = sumTestArray(slice); sum != 0 {
-		t.Error("failed to clear data. Sum is", sum)
-	}
+		if sum = sumTestArray(slice); sum != 0 {
+			t.Error("failed to clear data. Sum is", sum)
+		}
 
-	if sum = sumTestArray(sliceTestArray(array)); sum != 0 {
-		t.Error("failed to clear data (with recreated slice). Sum is", sum)
+		if sum = sumTestArray(sliceTestArray(array)); sum != 0 {
+			t.Error("failed to clear data (with recreated slice). Sum is", sum)
+		}
+
+		array.Free()
 	}
 }
 

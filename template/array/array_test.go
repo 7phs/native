@@ -6,6 +6,12 @@ import (
 	"testing"
 )
 
+func TestTArrayPoolKey(t *testing.T) {
+	if key := TArrayPoolKey(23, 45, 64); key != 23 {
+		t.Error("failed to get the first dimention in a list. Got ", key, ", but expected is ", 23)
+	}
+}
+
 func TestNewTArray(t *testing.T) {
 	array := NewTArray(16)
 	defer array.Free()
