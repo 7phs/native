@@ -4,6 +4,7 @@ import "C"
 import "bitbucket.org/7phs/native"
 
 // template type TArray(A, B, BSize)
+
 type A int
 type B C.int
 

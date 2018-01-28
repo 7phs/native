@@ -1,0 +1,1 @@
+A native (C) creating of the array to boost performance call CGO functions.

@@ -1,9 +1,10 @@
 package array
 
 import (
-	"bitbucket.org/7phs/native"
 	"reflect"
 	"testing"
+
+	"bitbucket.org/7phs/native"
 )
 
 func TestTArrayPoolKey(t *testing.T) {
