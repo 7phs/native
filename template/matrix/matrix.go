@@ -1,7 +1,7 @@
 package matrix
 
 import "C"
-import "bitbucket.org/7phs/native"
+import "github.com/7phs/native"
 
 // template type TMatrix(AM, BM, BMSize)
 type AM int

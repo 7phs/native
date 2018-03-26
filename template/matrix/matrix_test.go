@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"bitbucket.org/7phs/native"
+	"github.com/7phs/native"
 )
 
 func TestTMatrixPoolKey(t *testing.T) {

@@ -1,7 +1,7 @@
 package array
 
 import "C"
-import "bitbucket.org/7phs/native"
+import "github.com/7phs/native"
 
 // template type TArray(A, B, BSize)
 
